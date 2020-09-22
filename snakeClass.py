@@ -1,4 +1,7 @@
 import os
+import sys
+import time
+
 import pygame
 import argparse
 import numpy as np
@@ -7,7 +10,9 @@ import matplotlib.pyplot as plt
 from DQN import DQNAgent
 from random import randint
 from keras.utils import to_categorical
-
+from loguru import logger
+logger.remove()
+logger.add(sys.stderr, level="INFO")
 #################################
 #   Define parameters manually  #
 #################################
@@ -18,7 +23,7 @@ def define_parameters():
     params['first_layer_size'] = 150   # neurons in the first layer
     params['second_layer_size'] = 150   # neurons in the second layer
     params['third_layer_size'] = 150    # neurons in the third layer
-    params['episodes'] = 150            
+    params['episodes'] = 10
     params['memory_size'] = 2500
     params['batch_size'] = 500
     params['weights_path'] = 'weights/weights.hdf5'
@@ -203,6 +208,7 @@ def run(display_option, speed, params):
     counter_plot = []
     record = 0
     while counter_games < params['episodes']:
+        time_start=time.time()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -217,7 +223,9 @@ def run(display_option, speed, params):
         if display_option==True:
             display(player1, food1, game, record)
 
+        time_start_game_update = time.time()
         while not game.crash:
+            time_start_game_update_pygame = time.time()
             if not params['train']:
                 agent.epsilon = 0
             else:
@@ -241,6 +249,9 @@ def run(display_option, speed, params):
 
             # set reward for the new state
             reward = agent.set_reward(player1, game.crash)
+            time_end_game_update_pygame = time.time()
+
+            time_start_game_update_train = time.time()
 
             if params['train']:
                 # train short memory base on the new action and state
@@ -248,12 +259,34 @@ def run(display_option, speed, params):
                 # store the new data into a long term memory
                 agent.remember(state_old, final_move, reward, state_new, game.crash)
 
+            time_end_game_update_train = time.time()
+
+            time_start_game_update_record = time.time()
             record = get_record(game.score, record)
-            if display_option:
+            time_end_game_update_record = time.time()
+
+            logger.debug("Pygame update step: "+str((time_end_game_update_pygame-time_start_game_update_pygame)))
+            logger.debug("Train short term update step: "+str((time_end_game_update_train-time_start_game_update_train)))
+            logger.debug("Record score  step: "+str((time_end_game_update_record-time_start_game_update_record)))
+
+
+            if display_option==True:
                 display(player1, food1, game, record)
                 pygame.time.wait(speed)
+
+        logger.debug("===========================")
+        time_end_game_update = time.time()
+        logger.info("Time to play one game: " + str((time_end_game_update - time_start_game_update)))
+
+        time_start_long_term = time.time()
         if params['train']:
             agent.replay_new(agent.memory, params['batch_size'])
+        time_end_long_term = time.time()
+        logger.info(
+            "Train long term update step: " + str((time_end_long_term - time_start_long_term)))
+        logger.debug("===========================")
+
+
         counter_games += 1
         print(f'Game {counter_games}      Score: {game.score}')
         score_plot.append(game.score)

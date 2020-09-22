@@ -1,0 +1,8 @@
+pygame
+numpy
+tensorflow
+seaborn
+loguru
+black
+matplotlib
+keras
