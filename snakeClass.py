@@ -20,15 +20,30 @@ def define_parameters():
     params = dict()
     params['epsilon_decay_linear'] = 1/75
     params['learning_rate'] = 0.0005
-    params['first_layer_size'] = 150   # neurons in the first layer
-    params['second_layer_size'] = 150   # neurons in the second layer
-    params['third_layer_size'] = 150    # neurons in the third layer
-    params['episodes'] = 10
+    params['layer1'] = 150
+    params['layer2'] = 150
+    params['layer3'] = 150
+    params['layer4'] = 150
+    params['layer5'] = 150
+    params['layer6'] = 150
+
+    params['episodes'] = 150
     params['memory_size'] = 2500
     params['batch_size'] = 500
     params['weights_path'] = 'weights/weights.hdf5'
-    params['load_weights'] = False
-    params['train'] = True
+
+    # #train
+    # params['load_weights'] = False
+    # params['train'] = True
+    # params["display"]=False
+    # params["speed"]=0
+
+    #visualise
+    params['load_weights'] = True
+    params['train'] = False
+    params["display"]=True
+    params["speed"]=50
+
     return params
 
 
@@ -298,11 +313,13 @@ def run(display_option, speed, params):
 
 if __name__ == '__main__':
     # Set options to activate or deactivate the game view, and its speed
+
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
     pygame.font.init()
     parser = argparse.ArgumentParser()
     params = define_parameters()
-    parser.add_argument("--display", type=bool, default=False)
-    parser.add_argument("--speed", type=int, default=50)
+    # parser.add_argument("--display", type=bool, default=True)
+    # parser.add_argument("--speed", type=int, default=50)
     args = parser.parse_args()
     params['bayesian_optimization'] = False    # Use bayesOpt.py for Bayesian Optimization
-    run(args.display, args.speed, params)
+    run(params["display"], params["speed"], params)

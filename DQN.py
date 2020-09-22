@@ -18,9 +18,13 @@ class DQNAgent(object):
         self.learning_rate = params['learning_rate']        
         self.epsilon = 1
         self.actual = []
-        self.first_layer = params['first_layer_size']
-        self.second_layer = params['second_layer_size']
-        self.third_layer = params['third_layer_size']
+        self.layer1 = params['layer1']
+        self.layer2 = params['layer2']
+        self.layer3 = params['layer3']
+        self.layer4 = params['layer4']
+        self.layer5 = params['layer5']
+        self.layer6 = params['layer6']
+
         self.memory = collections.deque(maxlen=params['memory_size'])
         self.weights = params['weights_path']
         self.load_weights = params['load_weights']
@@ -28,9 +32,12 @@ class DQNAgent(object):
 
     def network(self):
         model = Sequential()
-        model.add(Dense(output_dim=self.first_layer, activation='relu', input_dim=11))
-        model.add(Dense(output_dim=self.second_layer, activation='relu'))
-        model.add(Dense(output_dim=self.third_layer, activation='relu'))
+        model.add(Dense(output_dim=self.layer1, activation='relu', input_dim=11))
+        model.add(Dense(output_dim=self.layer2, activation='relu'))
+        model.add(Dense(output_dim=self.layer3, activation='relu'))
+        model.add(Dense(output_dim=self.layer4, activation='relu'))
+        model.add(Dense(output_dim=self.layer5, activation='relu'))
+        model.add(Dense(output_dim=self.layer6, activation='relu'))
         model.add(Dense(output_dim=3, activation='softmax'))
         opt = Adam(self.learning_rate)
         model.compile(loss='mse', optimizer=opt)

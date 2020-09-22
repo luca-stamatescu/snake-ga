@@ -1,8 +1,7 @@
 pygame
 numpy
-tensorflow
 seaborn
 loguru
 black
 matplotlib
-keras
+keras==2.3.1
