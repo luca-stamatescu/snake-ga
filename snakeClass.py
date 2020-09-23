@@ -314,7 +314,7 @@ def run(display_option, speed, params):
 if __name__ == '__main__':
     # Set options to activate or deactivate the game view, and its speed
 
-    # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
     pygame.font.init()
     parser = argparse.ArgumentParser()
     params = define_parameters()
