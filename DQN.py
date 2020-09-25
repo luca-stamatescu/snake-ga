@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from operator import add
 import collections
+import pickle
 
 
 class DQNAgent(object):
@@ -25,9 +26,22 @@ class DQNAgent(object):
         self.layer4 = params['layer4']
         self.layer5 = params['layer5']
         self.layer6 = params['layer6']
-        self.input_features=11
+        self.vision_distance_x = params['vision_distance_x']
+        self.vision_distance_y = params['vision_distance_y']
+        self.input_features=params['num_input_features']
 
-        self.memory = collections.deque(maxlen=params['memory_size'])
+        if params['load_weights']:
+            with open(params['memory_path'], 'rb') as handle:
+                self.memory=pickle.load(handle)
+        else:
+            self.memory = collections.deque(maxlen=params['memory_size'])
+
+
+
+
+
+
+
         self.weights = params['weights_path']
         self.load_weights = params['load_weights']
         self.model = self.network()
@@ -57,8 +71,7 @@ class DQNAgent(object):
         px = 20
         x_width = 420
         y_height = 420
-        vision_distance_x = 2
-        vision_distance_y = 2
+
 
         if player.x_change == -20:
             direction = "left"
@@ -114,7 +127,7 @@ class DQNAgent(object):
             rotated_snake_grid = snake_grid
             plt.imshow(rotated_snake_grid)
 
-        max_vision = max(vision_distance_x, vision_distance_x)
+        max_vision = max(self.vision_distance_x, self.vision_distance_x)
         rotated_snake_grid = np.pad(rotated_snake_grid, (max_vision, max_vision), 'constant', constant_values=(1, 1))
 
         # again, note the difference between X,Y and row,col. The slices have the buffer + 1 at the end, as numpy indexing is not inclusive.
@@ -123,21 +136,20 @@ class DQNAgent(object):
 
         # again, note the difference between X,Y and row,col. The slices have the buffer + 1 at the end, as numpy indexing is not inclusive.
         vision = rotated_snake_grid[
-                 int(spy_rotated / px - vision_distance_y):int(spy_rotated / px + vision_distance_y + 1),
-                 int(spx_rotated / px - vision_distance_x):int(spx_rotated / px + vision_distance_x + 1)]
+                 int(spy_rotated / px - self.vision_distance_y):int(spy_rotated / px + self.vision_distance_y + 1),
+                 int(spx_rotated / px - self.vision_distance_x):int(spx_rotated / px + self.vision_distance_x + 1)]
         state = []
 
         for i in range(0, vision.shape[0]):
             for j in range(0, vision.shape[1]):
                 if i == math.floor(vision.shape[0] / 2) and j == math.floor(vision.shape[1] / 2):
-                    print(i, j)
                     continue
                 state.append(vision[i, j] == 1.0)
 
         danger_left = vision[1, 0]==1.0
         danger_right = vision[1, 2]==1.0
         danger_straight = vision[0, 1]==1.0
-        state=[danger_left,danger_right,danger_straight]
+        # state=[danger_left,danger_right,danger_straight]
         other_features = [
 
 
@@ -162,7 +174,7 @@ class DQNAgent(object):
             else:
                 state[i]=0
 
-        return np.asarray(state)
+        return np.asarray(state),vision
 
     def set_reward(self, player, crash):
         self.reward = 0

@@ -1,7 +1,9 @@
 import os
+import pickle
 import sys
 import time
 
+import cv2
 import pygame
 import argparse
 import numpy as np
@@ -18,7 +20,6 @@ logger.add(sys.stderr, level="INFO")
 #################################
 def define_parameters():
     params = dict()
-    params['epsilon_decay_linear'] = 1/75
     params['learning_rate'] = 0.0005
     params['layer1'] = 150
     params['layer2'] = 150
@@ -27,22 +28,44 @@ def define_parameters():
     params['layer5'] = 150
     params['layer6'] = 150
 
-    params['episodes'] = 150
-    params['memory_size'] = 2500
+    #the vision is the number of units the snake looks in one direction. A vision of 4 means it looks 4 umits to the left and 4 units to the right- this makes the width of X 9.
+    params['vision_distance_x']=4
+    params['vision_distance_y']=4
+
+    params['episodes'] = 300
+    params['epsilon_decay_linear'] = 1/(params['episodes']/4)
+    params['min_epsilon']=0.01
+    params['memory_size'] = 100000
     params['batch_size'] = 500
     params['weights_path'] = 'weights/weights.hdf5'
+    params['memory_path'] = 'weights/memory'
 
-    # #train
-    # params['load_weights'] = False
-    # params['train'] = True
-    # params["display"]=False
-    # params["speed"]=0
+    #the vision adds one to make it an odd number, and then is a square of that size. The head of the snake is not passed as an input feature. For example vision of 8,8 would be a 9x9 square (81 features) minus the snakes head. Then a fixed number of features are added in the get_state function.
+    params['num_input_features']=(params['vision_distance_x']*2+1)*(params['vision_distance_y']*2+1)-1+8
 
-    #visualise
-    params['load_weights'] = True
-    params['train'] = False
-    params["display"]=True
-    params["speed"]=50
+    params['function'] = "train"
+
+    if params['function'] == "train":
+        #train
+        params['load_weights'] = False
+        params['train'] = True
+        params["display"]=False
+        params["speed"]=0
+
+    if params['function'] == "continue_training":
+        #train
+        params['load_weights'] = True
+        params['train'] = True
+        params["display"]=False
+        params["speed"]=0
+
+    if params['function'] == "visualise":
+        #visualise
+        params['load_weights'] = True
+        params['train'] = False
+        params["display"]=True
+        params["speed"]=50
+
 
     return params
 
@@ -188,10 +211,10 @@ def update_screen():
 
 
 def initialize_game(player, game, food, agent, batch_size):
-    state_init1 = agent.get_state(game, player, food)  # [0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0]
+    state_init1,vision = agent.get_state(game, player, food)  # [0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0]
     action = [1, 0, 0]
     player.do_move(action, player.x, player.y, game, food, agent)
-    state_init2 = agent.get_state(game, player, food)
+    state_init2,vision = agent.get_state(game, player, food)
     reward1 = agent.set_reward(player, game.crash)
     agent.remember(state_init1, action, reward1, state_init2, game.crash)
     agent.replay_new(agent.memory, batch_size)
@@ -245,22 +268,25 @@ def run(display_option, speed, params):
                 agent.epsilon = 0
             else:
                 # agent.epsilon is set to give randomness to actions
-                agent.epsilon = 1 - (counter_games * params['epsilon_decay_linear'])
+                if agent.epsilon<=params['min_epsilon']:
+                    agent.epsilon = params['min_epsilon']
+                else:
+                    agent.epsilon = 1 - (counter_games * params['epsilon_decay_linear'])
 
             # get old state
-            state_old = agent.get_state(game, player1, food1)
+            state_old,vision = agent.get_state(game, player1, food1)
 
             # perform random actions based on agent.epsilon, or choose the action
             if randint(0, 1) < agent.epsilon:
                 final_move = to_categorical(randint(0, 2), num_classes=3)
             else:
                 # predict action based on the old state
-                prediction = agent.model.predict(state_old.reshape((1, 11)))
+                prediction = agent.model.predict(state_old.reshape((1, params['num_input_features'])))
                 final_move = to_categorical(np.argmax(prediction[0]), num_classes=3)
 
             # perform new move and get new state
             player1.do_move(final_move, player1.x, player1.y, game, food1, agent)
-            state_new = agent.get_state(game, player1, food1)
+            state_new,vision = agent.get_state(game, player1, food1)
 
             # set reward for the new state
             reward = agent.set_reward(player1, game.crash)
@@ -286,35 +312,69 @@ def run(display_option, speed, params):
 
 
             if display_option==True:
+                cv2.imshow("Vision of the Snake", vision * 255.0)
+
+                # detect any kepresses
+                key = cv2.waitKey(1) & 0xFF
+                # if the `q` key was pressed, break from the loop
+                if key == ord("q"):
+                    break
                 display(player1, food1, game, record)
                 pygame.time.wait(speed)
 
+        # # Pause visualisation if crash
+        # if display_option==True:
+        #     cv2.imshow("Vision of the Snake", vision * 255.0)
+        #
+        #     # detect any kepresses
+        #     key = cv2.waitKey(1) & 0xFF
+        #     # if the `q` key was pressed, break from the loop
+        #     if key == ord("q"):
+        #         break
+        #     display(player1, food1, game, record)
+        #     pygame.time.wait(5000)
         logger.debug("===========================")
         time_end_game_update = time.time()
-        logger.info("Time to play one game: " + str((time_end_game_update - time_start_game_update)))
+        logger.debug("Time to play one game: " + str((time_end_game_update - time_start_game_update)))
 
         time_start_long_term = time.time()
         if params['train']:
             agent.replay_new(agent.memory, params['batch_size'])
         time_end_long_term = time.time()
-        logger.info(
+        logger.debug(
             "Train long term update step: " + str((time_end_long_term - time_start_long_term)))
+
+        if agent.epsilon <= params['min_epsilon']:
+            agent.epsilon = params['min_epsilon']
+        else:
+            agent.epsilon = 1 - (counter_games * params['epsilon_decay_linear'])
+        logger.info(agent.epsilon)
+
         logger.debug("===========================")
 
-
         counter_games += 1
-        print(f'Game {counter_games}      Score: {game.score}')
+        logger.info(f'Game {counter_games}      Score: {game.score}')
+        logger.info(len(agent.memory))
+
         score_plot.append(game.score)
         counter_plot.append(counter_games)
+        if params['train'] and counter_games%100==0:
+            agent.model.save_weights(params['weights_path'])
+            logger.info("===========SAVING THE MODEL================")
+            with open(params['memory_path'], 'wb') as handle:
+                pickle.dump(agent.memory, handle)
+
     if params['train']:
         agent.model.save_weights(params['weights_path'])
+        with open(params['memory_path'], 'wb') as handle:
+            pickle.dump(agent.memory, handle)
     plot_seaborn(counter_plot, score_plot)
 
 
 if __name__ == '__main__':
     # Set options to activate or deactivate the game view, and its speed
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
     pygame.font.init()
     parser = argparse.ArgumentParser()
     params = define_parameters()
