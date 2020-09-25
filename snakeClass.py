@@ -2,6 +2,7 @@ import os
 import pickle
 import sys
 import time
+from datetime import datetime
 
 import cv2
 import pygame
@@ -22,8 +23,8 @@ os.environ["SDL_VIDEODRIVER"] = "dummy"
 import pygame.display
 pygame.display.init()
 
-
-info_string="The very standard settings. Use GPU device 0"
+time_prefix = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
+info_string="a test"
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 
@@ -46,15 +47,19 @@ def define_parameters():
     params['vision_distance_x']=1
     params['vision_distance_y']=1
 
-    params['episodes'] = 150
+    params['episodes'] = 3
     # params['epsilon_decay_linear'] = 1/(params['episodes']/4)
     params['epsilon_decay_linear'] = 1/75
 
     params['min_epsilon']=0.00
     params['memory_size'] = 2500
     params['batch_size'] = 1000
-    params['weights_path'] = 'weights/weights_standard_retry.hdf5'
-    params['memory_path'] = 'weights/memory_standard_retry'
+
+
+
+    params['weights_path'] = 'weights/'+time_prefix+'_'+info_string+'_weights.hdf5'
+    params['memory_path'] = 'weights/'+time_prefix+'_'+info_string+'_memory'
+    params['params_path'] = 'weights/'+time_prefix+'_'+info_string+'_params'
 
     #the vision adds one to make it an odd number, and then is a square of that size. The head of the snake is not passed as an input feature. For example vision of 8,8 would be a 9x9 square (81 features) minus the snakes head. Then a fixed number of features are added in the get_state function.
     params['num_input_features']=(params['vision_distance_x']*2+1)*(params['vision_distance_y']*2+1)-1+8
@@ -396,6 +401,11 @@ def run(display_option, speed, params):
         agent.model.save_weights(params['weights_path'])
         with open(params['memory_path'], 'wb') as handle:
             pickle.dump(agent.memory, handle)
+        params['counter_plot'] = counter_plot
+        params['score_plot'] = score_plot
+        with open(params['params_path'], 'wb') as handle:
+            pickle.dump(params, handle)
+
     # plot_seaborn(counter_plot, score_plot)
 
 
