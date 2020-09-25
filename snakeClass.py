@@ -7,7 +7,7 @@ import cv2
 import pygame
 import argparse
 import numpy as np
-import seaborn as sns
+# import seaborn as sns
 import matplotlib.pyplot as plt
 from DQN import DQNAgent
 from random import randint
@@ -15,30 +15,46 @@ from keras.utils import to_categorical
 from loguru import logger
 logger.remove()
 logger.add(sys.stderr, level="INFO")
+
+
+import os
+os.environ["SDL_VIDEODRIVER"] = "dummy"
+import pygame.display
+pygame.display.init()
+
+
+info_string="The very standard settings. Use GPU device 0"
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
+
+
+
 #################################
 #   Define parameters manually  #
 #################################
 def define_parameters():
     params = dict()
     params['learning_rate'] = 0.0005
-    params['layer1'] = 150
-    params['layer2'] = 150
-    params['layer3'] = 150
+    params['layer1'] = 50
+    params['layer2'] = 300
+    params['layer3'] = 50
     params['layer4'] = 150
     params['layer5'] = 150
     params['layer6'] = 150
 
     #the vision is the number of units the snake looks in one direction. A vision of 4 means it looks 4 umits to the left and 4 units to the right- this makes the width of X 9.
-    params['vision_distance_x']=4
-    params['vision_distance_y']=4
+    params['vision_distance_x']=1
+    params['vision_distance_y']=1
 
-    params['episodes'] = 300
-    params['epsilon_decay_linear'] = 1/(params['episodes']/4)
-    params['min_epsilon']=0.01
-    params['memory_size'] = 100000
-    params['batch_size'] = 500
-    params['weights_path'] = 'weights/weights.hdf5'
-    params['memory_path'] = 'weights/memory'
+    params['episodes'] = 150
+    # params['epsilon_decay_linear'] = 1/(params['episodes']/4)
+    params['epsilon_decay_linear'] = 1/75
+
+    params['min_epsilon']=0.00
+    params['memory_size'] = 2500
+    params['batch_size'] = 1000
+    params['weights_path'] = 'weights/weights_standard_retry.hdf5'
+    params['memory_path'] = 'weights/memory_standard_retry'
 
     #the vision adds one to make it an odd number, and then is a square of that size. The head of the snake is not passed as an input feature. For example vision of 8,8 would be a 9x9 square (81 features) minus the snakes head. Then a fixed number of features are added in the get_state function.
     params['num_input_features']=(params['vision_distance_x']*2+1)*(params['vision_distance_y']*2+1)-1+8
@@ -246,6 +262,9 @@ def run(display_option, speed, params):
     counter_plot = []
     record = 0
     while counter_games < params['episodes']:
+        logger.info("===========================")
+        logger.info(f"{info_string}")
+
         time_start=time.time()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -255,11 +274,12 @@ def run(display_option, speed, params):
         game = Game(440, 440)
         player1 = game.player
         food1 = game.food
-
         # Perform first move
         initialize_game(player1, game, food1, agent, params['batch_size'])
+
         if display_option==True:
             display(player1, food1, game, record)
+
 
         time_start_game_update = time.time()
         while not game.crash:
@@ -333,28 +353,27 @@ def run(display_option, speed, params):
         #         break
         #     display(player1, food1, game, record)
         #     pygame.time.wait(5000)
-        logger.debug("===========================")
         time_end_game_update = time.time()
-        logger.debug("Time to play one game: " + str((time_end_game_update - time_start_game_update)))
+        logger.info("Time to play one game: " + str(round((time_end_game_update - time_start_game_update),3)))
 
         time_start_long_term = time.time()
         if params['train']:
             agent.replay_new(agent.memory, params['batch_size'])
         time_end_long_term = time.time()
-        logger.debug(
-            "Train long term update step: " + str((time_end_long_term - time_start_long_term)))
+        logger.info(
+            "Train long term update step: " + str(round((time_end_long_term - time_start_long_term),3)))
 
         if agent.epsilon <= params['min_epsilon']:
             agent.epsilon = params['min_epsilon']
         else:
             agent.epsilon = 1 - (counter_games * params['epsilon_decay_linear'])
-        logger.info(agent.epsilon)
+        logger.info(f'The epsilon value is: {agent.epsilon}')
 
         logger.debug("===========================")
 
         counter_games += 1
         logger.info(f'Game {counter_games}      Score: {game.score}')
-        logger.info(len(agent.memory))
+        logger.info(f'The agent memory length is: {len(agent.memory)}')
 
         score_plot.append(game.score)
         counter_plot.append(counter_games)
@@ -363,18 +382,29 @@ def run(display_option, speed, params):
             logger.info("===========SAVING THE MODEL================")
             with open(params['memory_path'], 'wb') as handle:
                 pickle.dump(agent.memory, handle)
+        logger.info("End Game Loop")
+        time_end=time.time()
+        epoch_timer=round((time_end - time_start),3)
+        logger.info(
+                    f"One epoch takes: {epoch_timer} seconds")
+        eta_prediction=round((params['episodes']-counter_games)*epoch_timer/60)
+        logger.info(
+                    f"Time remaining is: {eta_prediction} minutes")
+
 
     if params['train']:
         agent.model.save_weights(params['weights_path'])
         with open(params['memory_path'], 'wb') as handle:
             pickle.dump(agent.memory, handle)
-    plot_seaborn(counter_plot, score_plot)
+    # plot_seaborn(counter_plot, score_plot)
 
 
 if __name__ == '__main__':
     # Set options to activate or deactivate the game view, and its speed
 
     # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
+
     pygame.font.init()
     parser = argparse.ArgumentParser()
     params = define_parameters()
